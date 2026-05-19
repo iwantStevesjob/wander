@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wander.Ventures</title>
+    <title>TAXI WARS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
@@ -57,27 +57,15 @@
             height: 80px;
             cursor: pointer;
             z-index: 10;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            
-    background-color: #fff;
-    border: 0;
+            background: transparent;
+            border: 0;
+            padding: 0;
         }
 
-        
-#play-button svg {
-    width: 34px;
-    height: 34px;
-}
-
-
-        #play-button::after {
-            content: '';
-            width: 0;
-            height: 0;
-            margin-left: 5px;
+        #play-button svg {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
 
         #outro-overlay {
@@ -103,6 +91,10 @@
             max-width: 90%;
         }
 
+        #title-screen div:last-child {
+            transform: translateX(-0.18em);
+        }
+
         #jump-button,
         #subscribe-button {
             cursor: pointer;
@@ -112,7 +104,7 @@
             font-size: 2vw;
             font-weight: normal;
             border-radius: 50px;
-    border: 0;
+            border: 0;
             white-space: nowrap;
             text-decoration: none;
             font-family: inherit;
@@ -124,7 +116,6 @@
             line-height: 1.4;
             margin-bottom: 20px;
         }
-
 
         @media (max-width: 1200px) {
             #title-screen {
@@ -148,11 +139,15 @@
         </video>
 
         <video id="jumpVideo" playsinline preload="auto">
-            <source src="jumpin.mp4" type="video/mp4">
+            <source src="jump in.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>
 
-        <div id="play-button"></div>
+        <button id="play-button" aria-label="Play video">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+                <path fill="#fff" fill-rule="evenodd" d="M50 2a48 48 0 1 0 0 96a48 48 0 1 0 0-96zM40 30v40l34-20z" />
+            </svg>
+        </button>
 
         <div id="outro-overlay">
             <div id="title-screen">
@@ -164,108 +159,100 @@
         </div>
     </div>
 
-
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const myVideo = document.getElementById('myVideo');
-        const jumpVideo = document.getElementById('jumpVideo');
-        const playButton = document.getElementById('play-button');
-        const outroOverlay = document.getElementById('outro-overlay');
-        const jumpButton = document.getElementById('jump-button');
-        const wanderTitle = document.querySelector('#title-screen div:first-child');
-        const venturesTitle = document.querySelector('#title-screen div:last-child');
+        document.addEventListener('DOMContentLoaded', () => {
+            const myVideo = document.getElementById('myVideo');
+            const jumpVideo = document.getElementById('jumpVideo');
+            const playButton = document.getElementById('play-button');
+            const outroOverlay = document.getElementById('outro-overlay');
+            const jumpButton = document.getElementById('jump-button');
+            const wanderTitle = document.querySelector('#title-screen div:first-child');
+            const venturesTitle = document.querySelector('#title-screen div:last-child');
 
-        const fadeDuration = 2000;
+            const fadeDuration = 2000;
 
-        playButton.innerHTML = `
-            <svg viewBox="0 0 100 100" aria-hidden="true">
-                <polygon points="38,25 38,75 75,50" fill="none" stroke="#000" stroke-width="8" stroke-linejoin="round" />
-            </svg>
-        `;
+            wanderTitle.style.opacity = '0';
+            venturesTitle.style.opacity = '0';
+            jumpButton.style.opacity = '0';
+            jumpVideo.volume = 0;
+            wanderTitle.style.transition = 'opacity 1s ease-in-out';
+            venturesTitle.style.transition = 'opacity 1s ease-in-out';
+            jumpButton.style.transition = 'none';
+            outroOverlay.style.transition = `opacity ${fadeDuration}ms ease-in-out`;
 
-        wanderTitle.style.opacity = '0';
-        venturesTitle.style.opacity = '0';
-        jumpButton.style.opacity = '0';
-        jumpVideo.volume = 0;
-        wanderTitle.style.transition = 'opacity 1s ease-in-out';
-        venturesTitle.style.transition = 'opacity 1s ease-in-out';
-        jumpButton.style.transition = 'none';
-        outroOverlay.style.transition = `opacity ${fadeDuration}ms ease-in-out`;
+            playButton.addEventListener('click', () => {
+                myVideo.muted = false;
+                jumpVideo.muted = false;
 
-        playButton.addEventListener('click', () => {
-            myVideo.muted = false;
-            jumpVideo.muted = false;
+                myVideo.play().then(() => {
+                    playButton.style.display = 'none';
+                    outroOverlay.style.display = 'flex';
+                    outroOverlay.style.opacity = '1';
 
-            myVideo.play().then(() => {
-                playButton.style.display = 'none';
-                outroOverlay.style.display = 'flex';
+                    setTimeout(() => {
+                        wanderTitle.style.opacity = '1';
+                    }, 8000);
+
+                    setTimeout(() => {
+                        venturesTitle.style.opacity = '1';
+                    }, 14000);
+
+                    setTimeout(() => {
+                        jumpButton.style.opacity = '1';
+                    }, 22500);
+                }).catch(error => {
+                    console.error('Video playback failed:', error);
+                });
+            });
+
+            jumpButton.addEventListener('click', () => {
+                const firstVideoVolume = myVideo.volume;
+
+                jumpVideo.currentTime = 0;
+                jumpVideo.volume = 0;
+                jumpVideo.play();
+                jumpVideo.style.opacity = '1';
+                outroOverlay.style.opacity = '0';
+
+                const fadeOutAudio = setInterval(() => {
+                    myVideo.volume = Math.max(0, myVideo.volume - firstVideoVolume / 40);
+                }, 50);
+
+                setTimeout(() => {
+                    const fadeInAudio = setInterval(() => {
+                        jumpVideo.volume = Math.min(1, jumpVideo.volume + 0.05);
+
+                        if (jumpVideo.volume >= 1) {
+                            clearInterval(fadeInAudio);
+                        }
+                    }, 50);
+                }, 1000);
+
+                setTimeout(() => {
+                    clearInterval(fadeOutAudio);
+                    myVideo.volume = 0;
+                    myVideo.pause();
+                    myVideo.remove();
+                    outroOverlay.style.display = 'none';
+                }, fadeDuration);
+            });
+
+            jumpVideo.addEventListener('ended', () => {
+                outroOverlay.innerHTML = `
+                    <div id="title-screen">TITLE</div>
+                    <div id="outro-text">
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    </div>
+                    <form>
+                        <button id="subscribe-button" type="submit">SUBSCRIBE</button>
+                    </form>
+                `;
+
                 outroOverlay.style.opacity = '1';
-
-                setTimeout(() => {
-                    wanderTitle.style.opacity = '1';
-                }, 8000);
-
-                setTimeout(() => {
-                    venturesTitle.style.opacity = '1';
-                }, 14000);
-
-                setTimeout(() => {
-                    jumpButton.style.opacity = '1';
-                }, 22500);
-            }).catch(error => {
-                console.error('Video playback failed:', error);
+                outroOverlay.style.display = 'flex';
             });
         });
-
-        jumpButton.addEventListener('click', () => {
-            const firstVideoVolume = myVideo.volume;
-
-            jumpVideo.currentTime = 0;
-            jumpVideo.volume = 0;
-            jumpVideo.play();
-            jumpVideo.style.opacity = '1';
-            outroOverlay.style.opacity = '0';
-
-            const fadeOutAudio = setInterval(() => {
-                myVideo.volume = Math.max(0, myVideo.volume - firstVideoVolume / 40);
-            }, 50);
-
-            setTimeout(() => {
-                const fadeInAudio = setInterval(() => {
-                    jumpVideo.volume = Math.min(1, jumpVideo.volume + 0.05);
-
-                    if (jumpVideo.volume >= 1) {
-                        clearInterval(fadeInAudio);
-                    }
-                }, 50);
-            }, 1000);
-
-            setTimeout(() => {
-                clearInterval(fadeOutAudio);
-                myVideo.volume = 0;
-                myVideo.pause();
-                myVideo.remove();
-                outroOverlay.style.display = 'none';
-            }, fadeDuration);
-        });
-
-        jumpVideo.addEventListener('ended', () => {
-            outroOverlay.innerHTML = `
-                <div id="title-screen">TITLE</div>
-                <div id="outro-text">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                </div>
-                <form>
-                    <button id="subscribe-button" type="submit">SUBSCRIBE</button>
-                </form>
-            `;
-
-            outroOverlay.style.opacity = '1';
-            outroOverlay.style.display = 'flex';
-        });
-    });
-</script>
-
+    </script>
 
 </body>
 
