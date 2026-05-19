@@ -737,7 +737,13 @@
             document.addEventListener('mousemove', updateButtonFromPointer);
 
             document.addEventListener('click', event => {
-                if (event.target.id === 'projects-link') {
+                if (event.target.id === 'projects-link' || event.target.id === 'hire-button') {
+
+
+
+
+
+                
                     event.preventDefault();
                     projectsBackdrop.style.display = 'block';
                 }
