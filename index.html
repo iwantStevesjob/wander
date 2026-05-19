@@ -164,7 +164,8 @@
         </div>
     </div>
 
-<script>
+
+    <script>
     document.addEventListener('DOMContentLoaded', () => {
         const myVideo = document.getElementById('myVideo');
         const jumpVideo = document.getElementById('jumpVideo');
@@ -185,9 +186,10 @@
         wanderTitle.style.opacity = '0';
         venturesTitle.style.opacity = '0';
         jumpButton.style.opacity = '0';
+        jumpVideo.volume = 0;
         wanderTitle.style.transition = 'opacity 1s ease-in-out';
         venturesTitle.style.transition = 'opacity 1s ease-in-out';
-        jumpButton.style.transition = 'opacity 1s ease-in-out';
+        jumpButton.style.transition = 'none';
         outroOverlay.style.transition = `opacity ${fadeDuration}ms ease-in-out`;
 
         playButton.addEventListener('click', () => {
@@ -201,7 +203,7 @@
 
                 setTimeout(() => {
                     wanderTitle.style.opacity = '1';
-                }, 10000);
+                }, 8000);
 
                 setTimeout(() => {
                     venturesTitle.style.opacity = '1';
@@ -209,19 +211,38 @@
 
                 setTimeout(() => {
                     jumpButton.style.opacity = '1';
-                }, 22600);
+                }, 22500);
             }).catch(error => {
                 console.error('Video playback failed:', error);
             });
         });
 
         jumpButton.addEventListener('click', () => {
+            const firstVideoVolume = myVideo.volume;
+
             jumpVideo.currentTime = 0;
+            jumpVideo.volume = 0;
             jumpVideo.play();
             jumpVideo.style.opacity = '1';
             outroOverlay.style.opacity = '0';
 
+            const fadeOutAudio = setInterval(() => {
+                myVideo.volume = Math.max(0, myVideo.volume - firstVideoVolume / 40);
+            }, 50);
+
             setTimeout(() => {
+                const fadeInAudio = setInterval(() => {
+                    jumpVideo.volume = Math.min(1, jumpVideo.volume + 0.05);
+
+                    if (jumpVideo.volume >= 1) {
+                        clearInterval(fadeInAudio);
+                    }
+                }, 50);
+            }, 1000);
+
+            setTimeout(() => {
+                clearInterval(fadeOutAudio);
+                myVideo.volume = 0;
                 myVideo.pause();
                 myVideo.remove();
                 outroOverlay.style.display = 'none';
@@ -244,7 +265,6 @@
         });
     });
 </script>
-
 
 
 </body>
