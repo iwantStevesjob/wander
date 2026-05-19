@@ -164,7 +164,7 @@
         </div>
     </div>
 
-   <script>
+<script>
     document.addEventListener('DOMContentLoaded', () => {
         const myVideo = document.getElementById('myVideo');
         const jumpVideo = document.getElementById('jumpVideo');
@@ -174,7 +174,6 @@
         const wanderTitle = document.querySelector('#title-screen div:first-child');
         const venturesTitle = document.querySelector('#title-screen div:last-child');
 
-        const fadeDelay = 3000;
         const fadeDuration = 2000;
 
         playButton.innerHTML = `
@@ -186,6 +185,10 @@
         wanderTitle.style.opacity = '0';
         venturesTitle.style.opacity = '0';
         jumpButton.style.opacity = '0';
+        wanderTitle.style.transition = 'opacity 1s ease-in-out';
+        venturesTitle.style.transition = 'opacity 1s ease-in-out';
+        jumpButton.style.transition = 'opacity 1s ease-in-out';
+        outroOverlay.style.transition = `opacity ${fadeDuration}ms ease-in-out`;
 
         playButton.addEventListener('click', () => {
             myVideo.muted = false;
@@ -194,38 +197,35 @@
             myVideo.play().then(() => {
                 playButton.style.display = 'none';
                 outroOverlay.style.display = 'flex';
+                outroOverlay.style.opacity = '1';
 
                 setTimeout(() => {
-                    wanderTitle.style.transition = 'opacity 1s ease-in-out';
                     wanderTitle.style.opacity = '1';
-                }, 8000);
+                }, 10000);
 
                 setTimeout(() => {
-                    venturesTitle.style.transition = 'opacity 1s ease-in-out';
                     venturesTitle.style.opacity = '1';
                 }, 14000);
 
                 setTimeout(() => {
                     jumpButton.style.opacity = '1';
-                }, 22500);
+                }, 22600);
             }).catch(error => {
                 console.error('Video playback failed:', error);
             });
         });
 
         jumpButton.addEventListener('click', () => {
-            outroOverlay.style.display = 'none';
+            jumpVideo.currentTime = 0;
+            jumpVideo.play();
+            jumpVideo.style.opacity = '1';
+            outroOverlay.style.opacity = '0';
 
             setTimeout(() => {
-                jumpVideo.currentTime = 0;
-                jumpVideo.play();
-                jumpVideo.style.opacity = '1';
-
-                setTimeout(() => {
-                    myVideo.pause();
-                    myVideo.remove();
-                }, fadeDuration);
-            }, fadeDelay);
+                myVideo.pause();
+                myVideo.remove();
+                outroOverlay.style.display = 'none';
+            }, fadeDuration);
         });
 
         jumpVideo.addEventListener('ended', () => {
@@ -239,10 +239,12 @@
                 </form>
             `;
 
+            outroOverlay.style.opacity = '1';
             outroOverlay.style.display = 'flex';
         });
     });
 </script>
+
 
 
 </body>
