@@ -59,15 +59,40 @@
         #motion-hint {
             position: absolute;
             left: 50%;
-            bottom: 34px;
+            top: 66%;
             z-index: 10;
             display: none;
-            width: 34px;
-            height: 86px;
-            transform: translateX(-50%);
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.9);
+            width: 88px;
+            height: 118px;
+            transform: translate(-50%, -50%);
             pointer-events: none;
+        }
+
+        #motion-hint svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            animation: phone-tilt 2.4s ease-in-out infinite;
+            transform-origin: 50% 78%;
+        }
+
+        @keyframes phone-tilt {
+            0%,
+            100% {
+                transform: rotate(0deg) skewX(0deg) scaleX(1);
+            }
+
+            25% {
+                transform: rotate(-18deg) skewX(-5deg) scaleX(0.92);
+            }
+
+            50% {
+                transform: rotate(0deg) skewX(0deg) scaleX(1);
+            }
+
+            75% {
+                transform: rotate(18deg) skewX(5deg) scaleX(0.92);
+            }
         }
 
         #outro-overlay {
@@ -94,6 +119,7 @@
             line-height: 0.8;
             margin-bottom: 15px;
             max-width: 90%;
+            text-align: center;
         }
 
         #title-screen div {
@@ -177,6 +203,7 @@
             line-height: 1.4;
             margin-bottom: 20px;
             pointer-events: auto;
+            text-align: left;
         }
 
         #outro-text p {
@@ -204,10 +231,10 @@
             inset: 150px;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-start;
             background: #fff;
             color: #000;
-            border-radius: 60px;
+            border-radius: 32px;
             padding: 40px;
             box-sizing: border-box;
             overflow: auto;
@@ -217,13 +244,14 @@
             font-size: 120px;
             line-height: 0.8;
             margin-bottom: 40px;
+            text-align: left;
         }
 
         #project-list {
             display: flex;
             gap: 32px;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             flex-wrap: wrap;
             width: 100%;
         }
@@ -238,12 +266,6 @@
         @media (pointer: coarse) {
             #play-button {
                 opacity: 1;
-            }
-        }
-
-        @media (pointer: coarse) and (orientation: portrait) {
-            #motion-hint {
-                display: block;
             }
         }
 
@@ -277,7 +299,7 @@
 
             #projects-modal {
                 inset: 10px;
-                border-radius: 36px;
+                border-radius: 22px;
                 padding: 20px 10px;
             }
         }
@@ -297,7 +319,16 @@
             Your browser does not support the video tag.
         </video>
 
-        <div id="motion-hint"></div>
+        <div id="motion-hint">
+            <svg viewBox="0 0 120 160" aria-hidden="true">
+                <mask id="phone-cutout">
+                    <rect width="120" height="160" fill="white" />
+                    <rect x="24" y="22" width="72" height="104" rx="4" fill="black" />
+                    <rect x="52" y="136" width="16" height="8" rx="4" fill="black" />
+                </mask>
+                <rect x="14" y="4" width="92" height="152" rx="14" fill="#fff" mask="url(#phone-cutout)" />
+            </svg>
+        </div>
 
         <div id="outro-overlay">
             <div id="title-screen">
@@ -368,6 +399,7 @@
             let hideButtonTimeout;
             let buttonMoveTimeout;
             let portraitPanFrame;
+            let motionHintTimeout;
             let devicePanningReady = false;
             let deviceOrientationActive = false;
             let neutralGamma = null;
@@ -405,6 +437,16 @@
                 return myVideo.videoWidth / myVideo.videoHeight > videoContainer.clientWidth / videoContainer.clientHeight;
             }
 
+            function showMotionHint() {
+                if (isTouchMode() && isPortraitCropMode() && devicePanningReady) {
+                    motionHint.style.display = 'block';
+                }
+            }
+
+            function hideMotionHint() {
+                motionHint.style.display = 'none';
+            }
+
             function handleDeviceOrientation(event) {
                 if (!devicePanningReady || !isPortraitCropMode() || !Number.isFinite(event.gamma)) {
                     return;
@@ -415,16 +457,20 @@
                 }
 
                 const twist = event.gamma - neutralGamma;
-                const threshold = 8;
-                const maxTwist = 32;
+                const threshold = 10;
+                const maxTwist = 34;
                 const twistAmount = Math.abs(twist);
 
-                let targetX = 50;
-
-                if (twistAmount > threshold) {
-                    const curvedTwist = smoothstep(clamp((twistAmount - threshold) / (maxTwist - threshold), 0, 1));
-                    targetX = clamp(50 + Math.sign(twist) * curvedTwist * 50, 0, 100);
+                if (twistAmount <= threshold) {
+                    smoothedDeviceX += (50 - smoothedDeviceX) * 0.04;
+                    setVideoX(smoothedDeviceX);
+                    return;
                 }
+
+                hideMotionHint();
+
+                const curvedTwist = smoothstep(clamp((twistAmount - threshold) / (maxTwist - threshold), 0, 1));
+                const targetX = clamp(50 + Math.sign(twist) * curvedTwist * 50, 0, 100);
 
                 smoothedDeviceX += (targetX - smoothedDeviceX) * 0.06;
                 setVideoX(smoothedDeviceX);
@@ -434,6 +480,9 @@
                 devicePanningReady = true;
                 neutralGamma = null;
                 smoothedDeviceX = 50;
+
+                clearTimeout(motionHintTimeout);
+                motionHintTimeout = setTimeout(showMotionHint, 1000);
 
                 if (!deviceOrientationActive) {
                     deviceOrientationActive = true;
@@ -461,6 +510,8 @@
 
             function startPortraitPan() {
                 cancelAnimationFrame(portraitPanFrame);
+                clearTimeout(motionHintTimeout);
+                hideMotionHint();
                 devicePanningReady = false;
 
                 if (!isPortraitCropMode()) {
@@ -701,6 +752,7 @@
             window.addEventListener('resize', () => {
                 if (!isPortraitCropMode()) {
                     cancelAnimationFrame(portraitPanFrame);
+                    hideMotionHint();
                     setVideoX(50);
                 }
 
@@ -785,7 +837,7 @@
 
             jumpVideo.addEventListener('ended', () => {
                 playButton.style.display = 'none';
-                motionHint.style.display = 'none';
+                hideMotionHint();
 
                 outroOverlay.innerHTML = `
                     <div id="title-screen">THIS IS CHANCHO</div>
