@@ -101,7 +101,7 @@
             background: transparent;
             border: 0;
             padding: 0;
-            opacity: 1;
+            opacity: 0;
             transition: opacity 1s ease-in-out;
             pointer-events: auto;
         }
@@ -121,11 +121,11 @@
         }
 
         #play-button .mute-slash-cutout {
-            display: none;
+            display: block;
         }
 
-        #play-button.muted-icon .mute-slash-cutout {
-            display: block;
+        #play-button.sound-on-icon .mute-slash-cutout {
+            display: none;
         }
 
         #jump-button,
@@ -195,10 +195,10 @@
                             <rect width="120" height="120" fill="white" />
                             <g transform="translate(10 10)">
                                 <path d="M25 40h14l20-18v56L39 60H25z" fill="black" />
-                                <path d="M67 36q12 14 0 28" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
-                                <path d="M77 25q22 25 0 50" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
+                                <path d="M67 36q12 14 0 28" fill="none" stroke="black" stroke-width="8" stroke-linecap="square" />
+                                <path d="M77 25q22 25 0 50" fill="none" stroke="black" stroke-width="8" stroke-linecap="square" />
                             </g>
-                            <path class="mute-slash-cutout" d="M88 30L32 90" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
+                            <path class="mute-slash-cutout" d="M92 27L28 93" fill="none" stroke="black" stroke-width="14" stroke-linecap="butt" />
                         </mask>
                         <circle cx="60" cy="60" r="58" fill="#fff" mask="url(#volume-cutout)" />
                     </svg>
@@ -223,16 +223,61 @@
             let buttonIsCorner = false;
             let introStarted = false;
             let soundOn = false;
+            let waveVolumeLevel = 0;
             let fadeInAudio;
+            let fadeWaveAudio;
             let fadeInDelay;
             let hideButtonTimeout;
 
             jumpVideo.volume = 0;
+            myVideo.volume = 0;
             wanderTitle.style.transition = 'opacity 1s ease-in-out';
             venturesTitle.style.transition = 'opacity 1s ease-in-out';
             jumpButton.style.transition = 'none';
 
             outroOverlay.style.display = 'flex';
+
+            function getWaveLoopVolume() {
+                if (!Number.isFinite(myVideo.duration) || myVideo.duration <= 0) {
+                    return 1;
+                }
+
+                const fadeSeconds = Math.min(2, myVideo.duration / 2);
+                const timeToEnd = myVideo.duration - myVideo.currentTime;
+
+                if (myVideo.currentTime < fadeSeconds) {
+                    return myVideo.currentTime / fadeSeconds;
+                }
+
+                if (timeToEnd < fadeSeconds) {
+                    return Math.max(0, timeToEnd / fadeSeconds);
+                }
+
+                return 1;
+            }
+
+            function applyWaveVolume() {
+                myVideo.volume = soundOn ? waveVolumeLevel * getWaveLoopVolume() : 0;
+            }
+
+            function fadeWaveVolume(targetVolume) {
+                clearInterval(fadeWaveAudio);
+
+                const startVolume = waveVolumeLevel;
+                let step = 0;
+
+                fadeWaveAudio = setInterval(() => {
+                    step++;
+                    waveVolumeLevel = startVolume + (targetVolume - startVolume) * (step / 20);
+                    applyWaveVolume();
+
+                    if (step >= 20) {
+                        clearInterval(fadeWaveAudio);
+                        waveVolumeLevel = targetVolume;
+                        applyWaveVolume();
+                    }
+                }, 50);
+            }
 
             function fadeVolume(video, targetVolume) {
                 clearInterval(fadeInAudio);
@@ -269,6 +314,13 @@
             function moveButtonToCorner() {
                 if (buttonIsCorner) {
                     playButton.style.display = 'block';
+
+                    setTimeout(() => {
+                        playButton.classList.toggle('sound-on-icon', soundOn);
+                        playButton.style.opacity = '1';
+                        showButtonWhileMoving();
+                    }, 500);
+
                     return;
                 }
 
@@ -277,6 +329,7 @@
                 setTimeout(() => {
                     videoContainer.appendChild(playButton);
                     playButton.classList.add('corner');
+                    playButton.classList.toggle('sound-on-icon', soundOn);
                     buttonIsCorner = true;
                     playButton.style.display = 'block';
                     playButton.style.opacity = '1';
@@ -334,11 +387,13 @@
                 } else if (distance <= rect.width / 2) {
                     playButton.style.opacity = '1';
                 } else {
-                    playButton.style.opacity = Math.min(0.9, (edgeDistance - 100) / Math.max(1, distance - rect.width / 2) * 0.9);
+                    playButton.style.opacity = Math.min(0.8, (edgeDistance - 100) / Math.max(1, distance - rect.width / 2) * 0.8);
                 }
             });
 
             myVideo.addEventListener('playing', startIntroTimers, { once: true });
+            myVideo.addEventListener('timeupdate', applyWaveVolume);
+            setInterval(applyWaveVolume, 100);
 
             myVideo.play().catch(error => {
                 console.error('Autoplay failed:', error);
@@ -346,42 +401,44 @@
 
             playButton.addEventListener('click', () => {
                 clearTimeout(fadeInDelay);
+                playButton.style.opacity = '0';
 
                 if (soundOn) {
                     soundOn = false;
                     myVideo.muted = true;
                     jumpVideo.muted = true;
-                    playButton.classList.remove('muted-icon');
+                    fadeWaveVolume(0);
+                    moveButtonToCorner();
                     return;
                 }
 
-                const activeVideo = jumpVideo.style.opacity === '1' ? jumpVideo : myVideo;
-
                 soundOn = true;
-                activeVideo.muted = false;
-                activeVideo.volume = 0;
-                playButton.classList.add('muted-icon');
+                myVideo.muted = false;
+                fadeWaveVolume(1);
+
+                if (jumpVideo.style.opacity === '1') {
+                    jumpVideo.muted = false;
+                    jumpVideo.volume = 0;
+                    fadeVolume(jumpVideo, 1);
+                }
+
                 moveButtonToCorner();
-                fadeVolume(activeVideo, 1);
             });
 
             jumpButton.addEventListener('click', () => {
-                const firstVideoVolume = soundOn ? myVideo.volume : 0;
-
                 soundOn = true;
+                myVideo.muted = false;
+                fadeWaveVolume(1);
+
                 jumpVideo.currentTime = 0;
                 jumpVideo.muted = false;
                 jumpVideo.volume = 0;
-                playButton.classList.add('muted-icon');
+                playButton.style.opacity = '0';
                 moveButtonToCorner();
 
                 jumpVideo.play();
                 jumpVideo.style.opacity = '1';
                 outroOverlay.style.opacity = '0';
-
-                const fadeOutAudio = setInterval(() => {
-                    myVideo.volume = Math.max(0, myVideo.volume - firstVideoVolume / 40);
-                }, 50);
 
                 clearTimeout(fadeInDelay);
                 fadeInDelay = setTimeout(() => {
@@ -391,17 +448,15 @@
                 }, 1000);
 
                 setTimeout(() => {
-                    clearInterval(fadeOutAudio);
-                    myVideo.volume = 0;
-                    myVideo.pause();
-                    myVideo.remove();
                     outroOverlay.style.display = 'none';
                 }, 2000);
             });
 
             jumpVideo.addEventListener('ended', () => {
+                playButton.style.display = 'none';
+
                 outroOverlay.innerHTML = `
-                    <div id="title-screen">TITLE</div>
+                    <div id="title-screen">THIS IS CHANCHO</div>
                     <div id="outro-text">
                         Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                     </div>
