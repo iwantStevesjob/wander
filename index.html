@@ -107,7 +107,7 @@
         }
 
         #play-button.corner {
-            position: fixed;
+            position: absolute;
             right: 24px;
             bottom: 24px;
             width: 68px;
@@ -120,11 +120,11 @@
             display: block;
         }
 
-        #play-button .mute-slash {
+        #play-button .mute-slash-cutout {
             display: none;
         }
 
-        #play-button.muted-icon .mute-slash {
+        #play-button.muted-icon .mute-slash-cutout {
             display: block;
         }
 
@@ -198,9 +198,9 @@
                                 <path d="M67 36q12 14 0 28" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
                                 <path d="M77 25q22 25 0 50" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
                             </g>
+                            <path class="mute-slash-cutout" d="M88 30L32 90" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
                         </mask>
                         <circle cx="60" cy="60" r="58" fill="#fff" mask="url(#volume-cutout)" />
-                        <path class="mute-slash" d="M88 30L32 90" fill="none" stroke="#000" stroke-width="8" stroke-linecap="round" />
                     </svg>
                 </button>
 
@@ -211,6 +211,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const videoContainer = document.getElementById('video-container');
             const myVideo = document.getElementById('myVideo');
             const jumpVideo = document.getElementById('jumpVideo');
             const playButton = document.getElementById('play-button');
@@ -224,6 +225,7 @@
             let soundOn = false;
             let fadeInAudio;
             let fadeInDelay;
+            let hideButtonTimeout;
 
             jumpVideo.volume = 0;
             wanderTitle.style.transition = 'opacity 1s ease-in-out';
@@ -249,6 +251,21 @@
                 }, 50);
             }
 
+            function showButtonWhileMoving() {
+                if (playButton.style.display === 'none') {
+                    return;
+                }
+
+                if (buttonIsCorner) {
+                    playButton.style.opacity = '1';
+                }
+
+                clearTimeout(hideButtonTimeout);
+                hideButtonTimeout = setTimeout(() => {
+                    playButton.style.opacity = '0';
+                }, 5000);
+            }
+
             function moveButtonToCorner() {
                 if (buttonIsCorner) {
                     playButton.style.display = 'block';
@@ -258,14 +275,12 @@
                 playButton.style.opacity = '0';
 
                 setTimeout(() => {
+                    videoContainer.appendChild(playButton);
                     playButton.classList.add('corner');
                     buttonIsCorner = true;
                     playButton.style.display = 'block';
-                    playButton.style.opacity = '0';
-
-                    requestAnimationFrame(() => {
-                        playButton.style.opacity = '1';
-                    });
+                    playButton.style.opacity = '1';
+                    showButtonWhileMoving();
                 }, 500);
             }
 
@@ -297,6 +312,8 @@
             }
 
             document.addEventListener('mousemove', event => {
+                showButtonWhileMoving();
+
                 if (buttonIsCorner || playButton.style.display === 'none') {
                     return;
                 }
@@ -305,9 +322,20 @@
                 const centerX = rect.left + rect.width / 2;
                 const centerY = rect.top + rect.height / 2;
                 const distance = Math.hypot(event.clientX - centerX, event.clientY - centerY);
-                const opacity = Math.max(0.15, Math.min(1, 1 - (distance - rect.width / 2) / 260));
+                const edgeDistance = Math.min(
+                    event.clientX,
+                    event.clientY,
+                    window.innerWidth - event.clientX,
+                    window.innerHeight - event.clientY
+                );
 
-                playButton.style.opacity = opacity;
+                if (edgeDistance <= 100) {
+                    playButton.style.opacity = '0';
+                } else if (distance <= rect.width / 2) {
+                    playButton.style.opacity = '1';
+                } else {
+                    playButton.style.opacity = Math.min(0.9, (edgeDistance - 100) / Math.max(1, distance - rect.width / 2) * 0.9);
+                }
             });
 
             myVideo.addEventListener('playing', startIntroTimers, { once: true });
