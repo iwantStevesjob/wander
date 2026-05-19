@@ -57,21 +57,26 @@
             height: 80px;
             cursor: pointer;
             z-index: 10;
-            background-color: rgba(0, 0, 0, 0.5);
             border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.8);
             display: flex;
             justify-content: center;
             align-items: center;
+            
+    background-color: #fff;
+    border: 0;
         }
+
+        
+#play-button svg {
+    width: 34px;
+    height: 34px;
+}
+
 
         #play-button::after {
             content: '';
             width: 0;
             height: 0;
-            border-top: 15px solid transparent;
-            border-bottom: 15px solid transparent;
-            border-left: 25px solid rgba(255, 255, 255, 0.8);
             margin-left: 5px;
         }
 
@@ -107,7 +112,7 @@
             font-size: 2vw;
             font-weight: normal;
             border-radius: 50px;
-            border: 2px solid rgba(255, 255, 255, 0.8);
+    border: 0;
             white-space: nowrap;
             text-decoration: none;
             font-family: inherit;
@@ -119,6 +124,7 @@
             line-height: 1.4;
             margin-bottom: 20px;
         }
+
 
         @media (max-width: 1200px) {
             #title-screen {
@@ -158,60 +164,86 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const myVideo = document.getElementById('myVideo');
-            const jumpVideo = document.getElementById('jumpVideo');
-            const playButton = document.getElementById('play-button');
-            const outroOverlay = document.getElementById('outro-overlay');
-            const jumpButton = document.getElementById('jump-button');
+   <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const myVideo = document.getElementById('myVideo');
+        const jumpVideo = document.getElementById('jumpVideo');
+        const playButton = document.getElementById('play-button');
+        const outroOverlay = document.getElementById('outro-overlay');
+        const jumpButton = document.getElementById('jump-button');
+        const wanderTitle = document.querySelector('#title-screen div:first-child');
+        const venturesTitle = document.querySelector('#title-screen div:last-child');
 
-            const fadeDelay = 3000;
-            const fadeDuration = 2000;
+        const fadeDelay = 3000;
+        const fadeDuration = 2000;
 
-            playButton.addEventListener('click', () => {
-                myVideo.muted = false;
-                jumpVideo.muted = false;
+        playButton.innerHTML = `
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+                <polygon points="38,25 38,75 75,50" fill="none" stroke="#000" stroke-width="8" stroke-linejoin="round" />
+            </svg>
+        `;
 
-                myVideo.play().then(() => {
-                    playButton.style.display = 'none';
-                    outroOverlay.style.display = 'flex';
-                }).catch(error => {
-                    console.error('Video playback failed:', error);
-                });
-            });
+        wanderTitle.style.opacity = '0';
+        venturesTitle.style.opacity = '0';
+        jumpButton.style.opacity = '0';
 
-            jumpButton.addEventListener('click', () => {
-                outroOverlay.style.display = 'none';
+        playButton.addEventListener('click', () => {
+            myVideo.muted = false;
+            jumpVideo.muted = false;
+
+            myVideo.play().then(() => {
+                playButton.style.display = 'none';
+                outroOverlay.style.display = 'flex';
 
                 setTimeout(() => {
-                    jumpVideo.currentTime = 0;
-                    jumpVideo.play();
-                    jumpVideo.style.opacity = '1';
-                    myVideo.style.opacity = '0';
+                    wanderTitle.style.transition = 'opacity 1s ease-in-out';
+                    wanderTitle.style.opacity = '1';
+                }, 8000);
 
-                    setTimeout(() => {
-                        myVideo.pause();
-                        myVideo.remove();
-                    }, fadeDuration);
-                }, fadeDelay);
-            });
+                setTimeout(() => {
+                    venturesTitle.style.transition = 'opacity 1s ease-in-out';
+                    venturesTitle.style.opacity = '1';
+                }, 14000);
 
-            jumpVideo.addEventListener('ended', () => {
-                outroOverlay.innerHTML = `
-                    <div id="title-screen">TITLE</div>
-                    <div id="outro-text">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                    </div>
-                    <form>
-                        <button id="subscribe-button" type="submit">SUBSCRIBE</button>
-                    </form>
-                `;
-
-                outroOverlay.style.display = 'flex';
+                setTimeout(() => {
+                    jumpButton.style.opacity = '1';
+                }, 22500);
+            }).catch(error => {
+                console.error('Video playback failed:', error);
             });
         });
-    </script>
+
+        jumpButton.addEventListener('click', () => {
+            outroOverlay.style.display = 'none';
+
+            setTimeout(() => {
+                jumpVideo.currentTime = 0;
+                jumpVideo.play();
+                jumpVideo.style.opacity = '1';
+
+                setTimeout(() => {
+                    myVideo.pause();
+                    myVideo.remove();
+                }, fadeDuration);
+            }, fadeDelay);
+        });
+
+        jumpVideo.addEventListener('ended', () => {
+            outroOverlay.innerHTML = `
+                <div id="title-screen">TITLE</div>
+                <div id="outro-text">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                </div>
+                <form>
+                    <button id="subscribe-button" type="submit">SUBSCRIBE</button>
+                </form>
+            `;
+
+            outroOverlay.style.display = 'flex';
+        });
+    });
+</script>
+
 
 </body>
 
