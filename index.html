@@ -48,39 +48,6 @@
             opacity: 0;
         }
 
-        #play-button {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80px;
-            height: 80px;
-            cursor: pointer;
-            z-index: 12;
-            background: transparent;
-            border: 0;
-            padding: 0;
-            opacity: 1;
-            transition: opacity 1s ease-in-out;
-        }
-
-        #play-button.corner {
-            top: auto;
-            left: auto;
-            right: 24px;
-            bottom: 24px;
-            transform: none;
-            width: 56px;
-            height: 56px;
-            opacity: 1;
-        }
-
-        #play-button svg {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
         #outro-overlay {
             position: absolute;
             top: 50%;
@@ -107,8 +74,58 @@
             max-width: 90%;
         }
 
+        #title-screen div {
+            opacity: 0;
+            visibility: hidden;
+        }
+
         #title-screen div:last-child {
             transform: translateX(-0.18em);
+        }
+
+        #button-slot {
+            display: grid;
+            place-items: center;
+            min-height: 96px;
+        }
+
+        #button-slot > * {
+            grid-area: 1 / 1;
+        }
+
+        #play-button {
+            width: 96px;
+            height: 96px;
+            cursor: pointer;
+            z-index: 12;
+            background: transparent;
+            border: 0;
+            padding: 0;
+            opacity: 1;
+            transition: opacity 1s ease-in-out;
+            pointer-events: auto;
+        }
+
+        #play-button.corner {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            width: 68px;
+            height: 68px;
+        }
+
+        #play-button svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #play-button .mute-slash {
+            display: none;
+        }
+
+        #play-button.muted-icon .mute-slash {
+            display: block;
         }
 
         #jump-button,
@@ -125,6 +142,11 @@
             text-decoration: none;
             font-family: inherit;
             pointer-events: auto;
+        }
+
+        #jump-button {
+            opacity: 0;
+            visibility: hidden;
         }
 
         #outro-text {
@@ -150,7 +172,7 @@
 <body>
 
     <div id="video-container">
-        <video id="myVideo" playsinline preload="auto" loop muted autoplay>
+        <video id="myVideo" playsinline preload="auto" loop muted>
             <source src="chancho.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>
@@ -160,25 +182,30 @@
             Your browser does not support the video tag.
         </video>
 
-        <button id="play-button" aria-label="Turn sound on">
-            <svg viewBox="0 0 100 100" aria-hidden="true">
-                <mask id="volume-cutout">
-                    <rect width="100" height="100" fill="white" />
-                    <path d="M25 40h14l20-18v56L39 60H25z" fill="black" />
-                    <path d="M67 36q12 14 0 28" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
-                    <path d="M77 25q22 25 0 50" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
-                </mask>
-                <circle cx="50" cy="50" r="48" fill="#fff" mask="url(#volume-cutout)" />
-            </svg>
-        </button>
-
         <div id="outro-overlay">
             <div id="title-screen">
                 <div>WANDER</div>
                 <div>VENTURES</div>
             </div>
 
-            <button id="jump-button">JUMP IN</button>
+            <div id="button-slot">
+                <button id="play-button" aria-label="Turn sound on">
+                    <svg viewBox="0 0 120 120" aria-hidden="true">
+                        <mask id="volume-cutout">
+                            <rect width="120" height="120" fill="white" />
+                            <g transform="translate(10 10)">
+                                <path d="M25 40h14l20-18v56L39 60H25z" fill="black" />
+                                <path d="M67 36q12 14 0 28" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
+                                <path d="M77 25q22 25 0 50" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
+                            </g>
+                        </mask>
+                        <circle cx="60" cy="60" r="58" fill="#fff" mask="url(#volume-cutout)" />
+                        <path class="mute-slash" d="M88 30L32 90" fill="none" stroke="#000" stroke-width="8" stroke-linecap="round" />
+                    </svg>
+                </button>
+
+                <button id="jump-button">JUMP IN</button>
+            </div>
         </div>
     </div>
 
@@ -192,75 +219,134 @@
             const wanderTitle = document.querySelector('#title-screen div:first-child');
             const venturesTitle = document.querySelector('#title-screen div:last-child');
 
-            let buttonBaseOpacity = 1;
             let buttonIsCorner = false;
+            let introStarted = false;
+            let soundOn = false;
+            let fadeInAudio;
+            let fadeInDelay;
 
-            wanderTitle.style.opacity = '0';
-            venturesTitle.style.opacity = '0';
-            jumpButton.style.opacity = '0';
             jumpVideo.volume = 0;
             wanderTitle.style.transition = 'opacity 1s ease-in-out';
             venturesTitle.style.transition = 'opacity 1s ease-in-out';
             jumpButton.style.transition = 'none';
 
+            outroOverlay.style.display = 'flex';
+
+            function fadeVolume(video, targetVolume) {
+                clearInterval(fadeInAudio);
+
+                const startVolume = video.volume;
+                let step = 0;
+
+                fadeInAudio = setInterval(() => {
+                    step++;
+                    video.volume = startVolume + (targetVolume - startVolume) * (step / 20);
+
+                    if (step >= 20) {
+                        clearInterval(fadeInAudio);
+                        video.volume = targetVolume;
+                    }
+                }, 50);
+            }
+
+            function moveButtonToCorner() {
+                if (buttonIsCorner) {
+                    playButton.style.display = 'block';
+                    return;
+                }
+
+                playButton.style.opacity = '0';
+
+                setTimeout(() => {
+                    playButton.classList.add('corner');
+                    buttonIsCorner = true;
+                    playButton.style.display = 'block';
+                    playButton.style.opacity = '0';
+
+                    requestAnimationFrame(() => {
+                        playButton.style.opacity = '1';
+                    });
+                }, 500);
+            }
+
+            function startIntroTimers() {
+                if (introStarted) {
+                    return;
+                }
+
+                introStarted = true;
+
+                setTimeout(() => {
+                    wanderTitle.style.visibility = 'visible';
+                    wanderTitle.style.opacity = '1';
+                }, 10000);
+
+                setTimeout(() => {
+                    venturesTitle.style.visibility = 'visible';
+                    venturesTitle.style.opacity = '1';
+                }, 14000);
+
+                setTimeout(() => {
+                    jumpButton.style.visibility = 'visible';
+                    jumpButton.style.opacity = '1';
+
+                    if (!buttonIsCorner) {
+                        playButton.style.display = 'none';
+                    }
+                }, 22700);
+            }
+
+            document.addEventListener('mousemove', event => {
+                if (buttonIsCorner || playButton.style.display === 'none') {
+                    return;
+                }
+
+                const rect = playButton.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const distance = Math.hypot(event.clientX - centerX, event.clientY - centerY);
+                const opacity = Math.max(0.15, Math.min(1, 1 - (distance - rect.width / 2) / 260));
+
+                playButton.style.opacity = opacity;
+            });
+
+            myVideo.addEventListener('playing', startIntroTimers, { once: true });
+
             myVideo.play().catch(error => {
                 console.error('Autoplay failed:', error);
             });
 
-            outroOverlay.style.display = 'flex';
+            playButton.addEventListener('click', () => {
+                clearTimeout(fadeInDelay);
 
-            document.addEventListener('mousemove', event => {
-                if (buttonIsCorner || playButton.matches(':hover')) {
-                    playButton.style.opacity = '1';
+                if (soundOn) {
+                    soundOn = false;
+                    myVideo.muted = true;
+                    jumpVideo.muted = true;
+                    playButton.classList.remove('muted-icon');
                     return;
                 }
 
-                const edgeDistance = Math.min(
-                    event.clientX,
-                    event.clientY,
-                    window.innerWidth - event.clientX,
-                    window.innerHeight - event.clientY
-                );
+                const activeVideo = jumpVideo.style.opacity === '1' ? jumpVideo : myVideo;
 
-                playButton.style.opacity = edgeDistance <= 150 ? '0' : buttonBaseOpacity;
-            });
-
-            setTimeout(() => {
-                wanderTitle.style.opacity = '1';
-
-                if (playButton.style.display !== 'none') {
-                    buttonBaseOpacity = Number(playButton.style.opacity) || 1;
-                    playButton.style.opacity = '0';
-
-                    setTimeout(() => {
-                        playButton.classList.add('corner');
-                        buttonIsCorner = true;
-                        playButton.style.opacity = '1';
-                    }, 1000);
-                }
-            }, 10000);
-
-            setTimeout(() => {
-                venturesTitle.style.opacity = '1';
-            }, 14000);
-
-            setTimeout(() => {
-                jumpButton.style.opacity = '1';
-            }, 22700);
-
-            playButton.addEventListener('click', () => {
-                myVideo.muted = false;
-                jumpVideo.muted = false;
-                myVideo.volume = 1;
-                playButton.style.display = 'none';
+                soundOn = true;
+                activeVideo.muted = false;
+                activeVideo.volume = 0;
+                playButton.classList.add('muted-icon');
+                moveButtonToCorner();
+                fadeVolume(activeVideo, 1);
             });
 
             jumpButton.addEventListener('click', () => {
-                const firstVideoVolume = myVideo.muted ? 0 : myVideo.volume;
+                const firstVideoVolume = soundOn ? myVideo.volume : 0;
 
+                soundOn = true;
                 jumpVideo.currentTime = 0;
                 jumpVideo.muted = false;
                 jumpVideo.volume = 0;
+                playButton.classList.add('muted-icon');
+                moveButtonToCorner();
+
                 jumpVideo.play();
                 jumpVideo.style.opacity = '1';
                 outroOverlay.style.opacity = '0';
@@ -269,14 +355,11 @@
                     myVideo.volume = Math.max(0, myVideo.volume - firstVideoVolume / 40);
                 }, 50);
 
-                setTimeout(() => {
-                    const fadeInAudio = setInterval(() => {
-                        jumpVideo.volume = Math.min(1, jumpVideo.volume + 0.05);
-
-                        if (jumpVideo.volume >= 1) {
-                            clearInterval(fadeInAudio);
-                        }
-                    }, 50);
+                clearTimeout(fadeInDelay);
+                fadeInDelay = setTimeout(() => {
+                    if (soundOn) {
+                        fadeVolume(jumpVideo, 1);
+                    }
                 }, 1000);
 
                 setTimeout(() => {
