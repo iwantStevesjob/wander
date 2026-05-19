@@ -56,6 +56,20 @@
             opacity: 0;
         }
 
+        #motion-hint {
+            position: absolute;
+            left: 50%;
+            bottom: 34px;
+            z-index: 10;
+            display: none;
+            width: 34px;
+            height: 86px;
+            transform: translateX(-50%);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.9);
+            pointer-events: none;
+        }
+
         #outro-overlay {
             position: absolute;
             top: 50%;
@@ -221,6 +235,18 @@
             display: block;
         }
 
+        @media (pointer: coarse) {
+            #play-button {
+                opacity: 1;
+            }
+        }
+
+        @media (pointer: coarse) and (orientation: portrait) {
+            #motion-hint {
+                display: block;
+            }
+        }
+
         @media (max-width: 1200px) {
             #title-screen,
             #projects-title {
@@ -234,9 +260,25 @@
         }
 
         @media (max-width: 700px) {
+            #outro-overlay {
+                width: calc(100vw - 20px);
+            }
+
+            #title-screen,
+            #projects-title {
+                font-size: 14vw;
+                max-width: 100%;
+            }
+
+            #outro-text {
+                width: 100%;
+                max-width: none;
+            }
+
             #projects-modal {
-                inset: 24px;
+                inset: 10px;
                 border-radius: 36px;
+                padding: 20px 10px;
             }
         }
     </style>
@@ -254,6 +296,8 @@
             <source src="jumpin.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>
+
+        <div id="motion-hint"></div>
 
         <div id="outro-overlay">
             <div id="title-screen">
@@ -310,6 +354,7 @@
             const wanderTitle = document.querySelector('#title-screen div:first-child');
             const venturesTitle = document.querySelector('#title-screen div:last-child');
             const projectsBackdrop = document.getElementById('projects-backdrop');
+            const motionHint = document.getElementById('motion-hint');
 
             let buttonIsCorner = false;
             let buttonChangingIcon = false;
@@ -335,6 +380,10 @@
             jumpButton.style.transition = 'none';
 
             outroOverlay.style.display = 'flex';
+
+            function isTouchMode() {
+                return window.matchMedia('(pointer: coarse)').matches;
+            }
 
             function clamp(value, min, max) {
                 return Math.max(min, Math.min(max, value));
@@ -367,10 +416,17 @@
 
                 const twist = event.gamma - neutralGamma;
                 const threshold = 8;
-                const adjustedTwist = Math.abs(twist) <= threshold ? 0 : twist - Math.sign(twist) * threshold;
-                const targetX = clamp(50 + adjustedTwist * 2, 0, 100);
+                const maxTwist = 32;
+                const twistAmount = Math.abs(twist);
 
-                smoothedDeviceX += (targetX - smoothedDeviceX) * 0.08;
+                let targetX = 50;
+
+                if (twistAmount > threshold) {
+                    const curvedTwist = smoothstep(clamp((twistAmount - threshold) / (maxTwist - threshold), 0, 1));
+                    targetX = clamp(50 + Math.sign(twist) * curvedTwist * 50, 0, 100);
+                }
+
+                smoothedDeviceX += (targetX - smoothedDeviceX) * 0.06;
                 setVideoX(smoothedDeviceX);
             }
 
@@ -435,8 +491,8 @@
                         return;
                     }
 
-                    if (elapsed <= 22000) {
-                        setVideoX(50 * smoothstep((elapsed - 12000) / 10000));
+                    if (elapsed <= 24000) {
+                        setVideoX(50 * smoothstep((elapsed - 12000) / 12000));
                         portraitPanFrame = requestAnimationFrame(animate);
                         return;
                     }
@@ -523,7 +579,7 @@
             }
 
             function setButtonOpacity(value) {
-                playButton.style.opacity = String(clamp(value, 0, 1));
+                playButton.style.opacity = String(isTouchMode() && playButton.style.display !== 'none' ? 1 : clamp(value, 0, 1));
             }
 
             function getButtonOpacity(event) {
@@ -556,6 +612,10 @@
             }
 
             function scheduleButtonHide() {
+                if (isTouchMode()) {
+                    return;
+                }
+
                 clearTimeout(hideButtonTimeout);
                 hideButtonTimeout = setTimeout(() => {
                     if (!playButton.matches(':hover')) {
@@ -587,7 +647,7 @@
 
                     playButton.style.display = 'block';
                     playButton.classList.toggle('sound-on-icon', soundOn);
-                    setButtonOpacity(0);
+                    setButtonOpacity(isTouchMode() ? 1 : 0);
                     buttonChangingIcon = false;
                 }, 1000);
             }
@@ -643,6 +703,8 @@
                     cancelAnimationFrame(portraitPanFrame);
                     setVideoX(50);
                 }
+
+                setButtonOpacity(isTouchMode() ? 1 : playButton.style.opacity);
             });
 
             myVideo.addEventListener('playing', () => {
@@ -723,12 +785,13 @@
 
             jumpVideo.addEventListener('ended', () => {
                 playButton.style.display = 'none';
+                motionHint.style.display = 'none';
 
                 outroOverlay.innerHTML = `
                     <div id="title-screen">THIS IS CHANCHO</div>
                     <div id="outro-text">
-                        <p>Hes my main project, but if you would like to see some of my other work <a href="#" id="projects-link">click here</a></p>
-                        <p>Or if you want to see more of Chancho, he has a <a href="https://www.tiktok.com/@chanchonovuela">TikTok</a></p>
+                        <p>Hes my main project, but if you would like to see more of my work <a href="#" id="projects-link">click here</a></p>
+                        <p>If you want more Chancho, he has a <a href="https://www.tiktok.com/@chanchonovuela">TikTok</a></p>
                     </div>
                     <form>
                         <button id="subscribe-button" type="submit">SUBSCRIBE</button>
