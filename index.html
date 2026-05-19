@@ -72,26 +72,22 @@
             width: 100%;
             height: 100%;
             display: block;
-            animation: phone-tilt 2.4s ease-in-out infinite;
-            transform-origin: 50% 78%;
+            animation: phone-tilt 3.6s ease-in-out infinite;
+            transform-origin: 50% 50%;
         }
 
         @keyframes phone-tilt {
             0%,
             100% {
-                transform: rotate(0deg) skewX(0deg) scaleX(1);
+                transform: rotate(0deg);
             }
 
-            25% {
-                transform: rotate(-18deg) skewX(-5deg) scaleX(0.92);
+            33% {
+                transform: rotate(-13deg);
             }
 
-            50% {
-                transform: rotate(0deg) skewX(0deg) scaleX(1);
-            }
-
-            75% {
-                transform: rotate(18deg) skewX(5deg) scaleX(0.92);
+            66% {
+                transform: rotate(13deg);
             }
         }
 
@@ -195,6 +191,7 @@
         #jump-button {
             opacity: 0;
             visibility: hidden;
+            transform: scale(1);
         }
 
         #outro-text {
@@ -295,6 +292,8 @@
             #outro-text {
                 width: 100%;
                 max-width: none;
+                padding: 0 18px;
+                box-sizing: border-box;
             }
 
             #projects-modal {
@@ -324,7 +323,7 @@
                 <mask id="phone-cutout">
                     <rect width="120" height="160" fill="white" />
                     <rect x="24" y="22" width="72" height="104" rx="4" fill="black" />
-                    <rect x="52" y="136" width="16" height="8" rx="4" fill="black" />
+                    <circle cx="60" cy="140" r="5" fill="black" />
                 </mask>
                 <rect x="14" y="4" width="92" height="152" rx="14" fill="#fff" mask="url(#phone-cutout)" />
             </svg>
@@ -382,6 +381,7 @@
             const playButton = document.getElementById('play-button');
             const outroOverlay = document.getElementById('outro-overlay');
             const jumpButton = document.getElementById('jump-button');
+            const titleScreen = document.getElementById('title-screen');
             const wanderTitle = document.querySelector('#title-screen div:first-child');
             const venturesTitle = document.querySelector('#title-screen div:last-child');
             const projectsBackdrop = document.getElementById('projects-backdrop');
@@ -399,17 +399,19 @@
             let hideButtonTimeout;
             let buttonMoveTimeout;
             let portraitPanFrame;
-            let motionHintTimeout;
             let devicePanningReady = false;
             let deviceOrientationActive = false;
+            let devicePermissionReady = typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission !== 'function';
+            let portraitPanComplete = false;
             let neutralGamma = null;
             let smoothedDeviceX = 50;
 
             jumpVideo.volume = 0;
             myVideo.volume = 0;
+            titleScreen.style.transition = 'opacity 1s ease-in-out';
+            jumpButton.style.transition = 'transform 150ms ease';
             wanderTitle.style.transition = 'opacity 1s ease-in-out';
             venturesTitle.style.transition = 'opacity 1s ease-in-out';
-            jumpButton.style.transition = 'none';
 
             outroOverlay.style.display = 'flex';
 
@@ -438,7 +440,7 @@
             }
 
             function showMotionHint() {
-                if (isTouchMode() && isPortraitCropMode() && devicePanningReady) {
+                if (isTouchMode() && isPortraitCropMode() && portraitPanComplete) {
                     motionHint.style.display = 'block';
                 }
             }
@@ -462,14 +464,13 @@
                 const twistAmount = Math.abs(twist);
 
                 if (twistAmount <= threshold) {
-                    smoothedDeviceX += (50 - smoothedDeviceX) * 0.04;
-                    setVideoX(smoothedDeviceX);
                     return;
                 }
 
                 hideMotionHint();
 
-                const curvedTwist = smoothstep(clamp((twistAmount - threshold) / (maxTwist - threshold), 0, 1));
+                const progress = clamp((twistAmount - threshold) / (maxTwist - threshold), 0, 1);
+                const curvedTwist = smoothstep(progress) * progress;
                 const targetX = clamp(50 + Math.sign(twist) * curvedTwist * 50, 0, 100);
 
                 smoothedDeviceX += (targetX - smoothedDeviceX) * 0.06;
@@ -477,12 +478,13 @@
             }
 
             function enableDevicePanning() {
+                if (!portraitPanComplete || !devicePermissionReady) {
+                    return;
+                }
+
                 devicePanningReady = true;
                 neutralGamma = null;
                 smoothedDeviceX = 50;
-
-                clearTimeout(motionHintTimeout);
-                motionHintTimeout = setTimeout(showMotionHint, 1000);
 
                 if (!deviceOrientationActive) {
                     deviceOrientationActive = true;
@@ -498,20 +500,20 @@
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                     DeviceOrientationEvent.requestPermission()
                         .then(permission => {
-                            if (permission === 'granted') {
-                                enableDevicePanning();
-                            }
+                            devicePermissionReady = permission === 'granted';
+                            enableDevicePanning();
                         })
                         .catch(() => {});
                 } else {
+                    devicePermissionReady = true;
                     enableDevicePanning();
                 }
             }
 
             function startPortraitPan() {
                 cancelAnimationFrame(portraitPanFrame);
-                clearTimeout(motionHintTimeout);
                 hideMotionHint();
+                portraitPanComplete = false;
                 devicePanningReady = false;
 
                 if (!isPortraitCropMode()) {
@@ -542,13 +544,15 @@
                         return;
                     }
 
-                    if (elapsed <= 24000) {
-                        setVideoX(50 * smoothstep((elapsed - 12000) / 12000));
+                    if (elapsed <= 23000) {
+                        setVideoX(50 * smoothstep((elapsed - 12000) / 11000));
                         portraitPanFrame = requestAnimationFrame(animate);
                         return;
                     }
 
                     setVideoX(50);
+                    portraitPanComplete = true;
+                    showMotionHint();
                     enableDevicePanning();
                 }
 
@@ -816,12 +820,26 @@
                 setButtonOpacity(0);
                 moveButtonToCorner();
 
+                jumpButton.style.transform = 'scale(0.92)';
+
+                setTimeout(() => {
+                    jumpButton.style.transform = 'scale(1)';
+                }, 150);
+
                 jumpVideo.play().catch(error => {
                     console.error('Jump video failed:', error);
                 });
 
                 jumpVideo.style.opacity = '1';
-                outroOverlay.style.opacity = '0';
+
+                setTimeout(() => {
+                    jumpButton.style.transition = 'transform 150ms ease, opacity 1s ease-in-out';
+                    jumpButton.style.opacity = '0';
+                }, 500);
+
+                setTimeout(() => {
+                    titleScreen.style.opacity = '0';
+                }, 1000);
 
                 clearTimeout(fadeInDelay);
                 fadeInDelay = setTimeout(() => {
