@@ -162,16 +162,81 @@
             font-size: 20px;
             line-height: 1.4;
             margin-bottom: 20px;
+            pointer-events: auto;
+        }
+
+        #outro-text p {
+            margin: 0;
+        }
+
+        #outro-text p + p {
+            margin-top: 1.4em;
+        }
+
+        #outro-text a {
+            color: #fff;
+        }
+
+        #projects-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            display: none;
+            background: rgba(0, 0, 0, 0.55);
+        }
+
+        #projects-modal {
+            position: absolute;
+            inset: 150px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #fff;
+            color: #000;
+            border-radius: 60px;
+            padding: 40px;
+            box-sizing: border-box;
+            overflow: auto;
+        }
+
+        #projects-title {
+            font-size: 120px;
+            line-height: 0.8;
+            margin-bottom: 40px;
+        }
+
+        #project-list {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        #project-list img {
+            max-width: 220px;
+            max-height: 160px;
+            object-fit: contain;
+            display: block;
         }
 
         @media (max-width: 1200px) {
-            #title-screen {
+            #title-screen,
+            #projects-title {
                 font-size: 10vw;
             }
 
             #jump-button,
             #subscribe-button {
                 font-size: 5vw;
+            }
+        }
+
+        @media (max-width: 700px) {
+            #projects-modal {
+                inset: 24px;
+                border-radius: 36px;
             }
         }
     </style>
@@ -217,6 +282,23 @@
         </div>
     </div>
 
+    <div id="projects-backdrop">
+        <div id="projects-modal">
+            <div id="projects-title">PROJECTS</div>
+            <div id="project-list">
+                <a href="https://colorlog.in">
+                    <img src="/projects/color.jpg" alt="Color">
+                </a>
+                <a href="https://unfinished.productions">
+                    <img src="/project/unfinishedproductions.png" alt="Unfinished Productions">
+                </a>
+                <a href="https://itscalledthelobby.com">
+                    <img src="/project/lobby.jpg" alt="The Lobby">
+                </a>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const videoContainer = document.getElementById('video-container');
@@ -227,6 +309,7 @@
             const jumpButton = document.getElementById('jump-button');
             const wanderTitle = document.querySelector('#title-screen div:first-child');
             const venturesTitle = document.querySelector('#title-screen div:last-child');
+            const projectsBackdrop = document.getElementById('projects-backdrop');
 
             let buttonIsCorner = false;
             let buttonChangingIcon = false;
@@ -242,6 +325,8 @@
             let portraitPanFrame;
             let devicePanningReady = false;
             let deviceOrientationActive = false;
+            let neutralGamma = null;
+            let smoothedDeviceX = 50;
 
             jumpVideo.volume = 0;
             myVideo.volume = 0;
@@ -276,11 +361,23 @@
                     return;
                 }
 
-                setVideoX(clamp(50 + event.gamma * 1.4, 0, 100));
+                if (neutralGamma === null) {
+                    neutralGamma = event.gamma;
+                }
+
+                const twist = event.gamma - neutralGamma;
+                const threshold = 8;
+                const adjustedTwist = Math.abs(twist) <= threshold ? 0 : twist - Math.sign(twist) * threshold;
+                const targetX = clamp(50 + adjustedTwist * 2, 0, 100);
+
+                smoothedDeviceX += (targetX - smoothedDeviceX) * 0.08;
+                setVideoX(smoothedDeviceX);
             }
 
             function enableDevicePanning() {
                 devicePanningReady = true;
+                neutralGamma = null;
+                smoothedDeviceX = 50;
 
                 if (!deviceOrientationActive) {
                     deviceOrientationActive = true;
@@ -308,6 +405,7 @@
 
             function startPortraitPan() {
                 cancelAnimationFrame(portraitPanFrame);
+                devicePanningReady = false;
 
                 if (!isPortraitCropMode()) {
                     setVideoX(50);
@@ -325,14 +423,20 @@
 
                     const elapsed = now - startTime;
 
-                    if (elapsed <= 20000) {
-                        setVideoX(100 - 100 * smoothstep(elapsed / 20000));
+                    if (elapsed <= 2000) {
+                        setVideoX(100);
                         portraitPanFrame = requestAnimationFrame(animate);
                         return;
                     }
 
-                    if (elapsed <= 40000) {
-                        setVideoX(50 * smoothstep((elapsed - 20000) / 20000));
+                    if (elapsed <= 12000) {
+                        setVideoX(100 - 100 * smoothstep((elapsed - 2000) / 10000));
+                        portraitPanFrame = requestAnimationFrame(animate);
+                        return;
+                    }
+
+                    if (elapsed <= 22000) {
+                        setVideoX(50 * smoothstep((elapsed - 12000) / 10000));
                         portraitPanFrame = requestAnimationFrame(animate);
                         return;
                     }
@@ -346,7 +450,7 @@
 
             function getWaveLoopEnd() {
                 if (jumpStarted) {
-                    return 40;
+                    return Number.isFinite(myVideo.duration) && myVideo.duration > 0 ? Math.min(40, myVideo.duration) : 40;
                 }
 
                 return Number.isFinite(myVideo.duration) && myVideo.duration > 0 ? myVideo.duration : 40;
@@ -370,7 +474,9 @@
             }
 
             function applyWaveVolume() {
-                if (jumpStarted && myVideo.currentTime >= 40) {
+                const loopEnd = getWaveLoopEnd();
+
+                if (jumpStarted && myVideo.currentTime >= loopEnd) {
                     myVideo.currentTime = 0;
                     myVideo.play().catch(error => {
                         console.error('Wave video failed:', error);
@@ -515,6 +621,23 @@
 
             document.addEventListener('mousemove', updateButtonFromPointer);
 
+            document.addEventListener('click', event => {
+                if (event.target.id === 'projects-link') {
+                    event.preventDefault();
+                    projectsBackdrop.style.display = 'block';
+                }
+
+                if (event.target === projectsBackdrop) {
+                    projectsBackdrop.style.display = 'none';
+                }
+            });
+
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    projectsBackdrop.style.display = 'none';
+                }
+            });
+
             window.addEventListener('resize', () => {
                 if (!isPortraitCropMode()) {
                     cancelAnimationFrame(portraitPanFrame);
@@ -566,7 +689,7 @@
                 jumpStarted = true;
                 soundOn = true;
 
-                if (myVideo.currentTime >= 40) {
+                if (myVideo.currentTime >= getWaveLoopEnd()) {
                     myVideo.currentTime = 0;
                 }
 
@@ -604,7 +727,8 @@
                 outroOverlay.innerHTML = `
                     <div id="title-screen">THIS IS CHANCHO</div>
                     <div id="outro-text">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                        <p>Hes my main project, but if you would like to see some of my other work <a href="#" id="projects-link">click here</a></p>
+                        <p>Or if you want to see more of Chancho, he has a <a href="https://www.tiktok.com/@chanchonovuela">TikTok</a></p>
                     </div>
                     <form>
                         <button id="subscribe-button" type="submit">SUBSCRIBE</button>
