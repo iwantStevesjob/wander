@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TAXI WARS</title>
+    <title>wander.ventures</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
@@ -60,6 +60,19 @@
             background: transparent;
             border: 0;
             padding: 0;
+            opacity: 1;
+            transition: opacity 1s ease-in-out;
+        }
+
+        #play-button.corner {
+            top: auto;
+            left: auto;
+            right: 24px;
+            bottom: 24px;
+            transform: none;
+            width: 56px;
+            height: 56px;
+            opacity: 1;
         }
 
         #play-button svg {
@@ -80,6 +93,8 @@
             text-align: center;
             color: #fff;
             background: transparent;
+            opacity: 1;
+            transition: opacity 2s ease-in-out;
         }
 
         #title-screen {
@@ -133,7 +148,7 @@
 <body>
 
     <div id="video-container">
-        <video id="myVideo" playsinline preload="auto" loop>
+        <video id="myVideo" playsinline preload="auto" loop muted autoplay>
             <source src="chancho.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>
@@ -143,9 +158,15 @@
             Your browser does not support the video tag.
         </video>
 
-        <button id="play-button" aria-label="Play video">
+        <button id="play-button" aria-label="Turn sound on">
             <svg viewBox="0 0 100 100" aria-hidden="true">
-                <path fill="#fff" fill-rule="evenodd" d="M50 2a48 48 0 1 0 0 96a48 48 0 1 0 0-96zM40 30v40l34-20z" />
+                <mask id="volume-cutout">
+                    <rect width="100" height="100" fill="white" />
+                    <path d="M25 40h14l20-18v56L39 60H25z" fill="black" />
+                    <path d="M67 36q12 14 0 28" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
+                    <path d="M77 25q22 25 0 50" fill="none" stroke="black" stroke-width="8" stroke-linecap="round" />
+                </mask>
+                <circle cx="50" cy="50" r="48" fill="#fff" mask="url(#volume-cutout)" />
             </svg>
         </button>
 
@@ -169,7 +190,8 @@
             const wanderTitle = document.querySelector('#title-screen div:first-child');
             const venturesTitle = document.querySelector('#title-screen div:last-child');
 
-            const fadeDuration = 2000;
+            let buttonBaseOpacity = 1;
+            let buttonIsCorner = false;
 
             wanderTitle.style.opacity = '0';
             venturesTitle.style.opacity = '0';
@@ -178,31 +200,56 @@
             wanderTitle.style.transition = 'opacity 1s ease-in-out';
             venturesTitle.style.transition = 'opacity 1s ease-in-out';
             jumpButton.style.transition = 'none';
-            outroOverlay.style.transition = `opacity ${fadeDuration}ms ease-in-out`;
+
+            myVideo.play().catch(error => {
+                console.error('Autoplay failed:', error);
+            });
+
+            outroOverlay.style.display = 'flex';
+
+            document.addEventListener('mousemove', event => {
+                if (buttonIsCorner || playButton.matches(':hover')) {
+                    playButton.style.opacity = '1';
+                    return;
+                }
+
+                const edgeDistance = Math.min(
+                    event.clientX,
+                    event.clientY,
+                    window.innerWidth - event.clientX,
+                    window.innerHeight - event.clientY
+                );
+
+                playButton.style.opacity = edgeDistance <= 150 ? '0' : buttonBaseOpacity;
+            });
+
+            setTimeout(() => {
+                wanderTitle.style.opacity = '1';
+
+                if (playButton.style.display !== 'none') {
+                    buttonBaseOpacity = Number(playButton.style.opacity) || 1;
+                    playButton.style.opacity = '0';
+
+                    setTimeout(() => {
+                        playButton.classList.add('corner');
+                        buttonIsCorner = true;
+                        playButton.style.opacity = '1';
+                    }, 1000);
+                }
+            }, 10000);
+
+            setTimeout(() => {
+                venturesTitle.style.opacity = '1';
+            }, 14000);
+
+            setTimeout(() => {
+                jumpButton.style.opacity = '1';
+            }, 22700);
 
             playButton.addEventListener('click', () => {
                 myVideo.muted = false;
                 jumpVideo.muted = false;
-
-                myVideo.play().then(() => {
-                    playButton.style.display = 'none';
-                    outroOverlay.style.display = 'flex';
-                    outroOverlay.style.opacity = '1';
-
-                    setTimeout(() => {
-                        wanderTitle.style.opacity = '1';
-                    }, 8000);
-
-                    setTimeout(() => {
-                        venturesTitle.style.opacity = '1';
-                    }, 14000);
-
-                    setTimeout(() => {
-                        jumpButton.style.opacity = '1';
-                    }, 22500);
-                }).catch(error => {
-                    console.error('Video playback failed:', error);
-                });
+                playButton.style.display = 'none';
             });
 
             jumpButton.addEventListener('click', () => {
@@ -234,7 +281,7 @@
                     myVideo.pause();
                     myVideo.remove();
                     outroOverlay.style.display = 'none';
-                }, fadeDuration);
+                }, 2000);
             });
 
             jumpVideo.addEventListener('ended', () => {
