@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wander.Ventures</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Archivo Black', sans-serif;
+        }
+
+        #video-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #myVideo,
+        #jumpVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: opacity 2s ease-in-out;
+        }
+
+        #myVideo {
+            z-index: 1;
+            opacity: 1;
+        }
+
+        #jumpVideo {
+            z-index: 2;
+            opacity: 0;
+        }
+
+        #play-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            cursor: pointer;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #play-button::after {
+            content: '';
+            width: 0;
+            height: 0;
+            border-top: 15px solid transparent;
+            border-bottom: 15px solid transparent;
+            border-left: 25px solid rgba(255, 255, 255, 0.8);
+            margin-left: 5px;
+        }
+
+        #outro-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 11;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            color: #fff;
+            background: transparent;
+        }
+
+        #title-screen {
+            color: #fff;
+            font-weight: normal;
+            font-size: 120px;
+            line-height: 0.8;
+            margin-bottom: 15px;
+            max-width: 90%;
+        }
+
+        #jump-button,
+        #subscribe-button {
+            cursor: pointer;
+            padding: 15px 40px;
+            background-color: skyblue;
+            color: #fff;
+            font-size: 2vw;
+            font-weight: normal;
+            border-radius: 50px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            white-space: nowrap;
+            text-decoration: none;
+            font-family: inherit;
+        }
+
+        #outro-text {
+            max-width: 700px;
+            font-size: 20px;
+            line-height: 1.4;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 1200px) {
+            #title-screen {
+                font-size: 10vw;
+            }
+
+            #jump-button,
+            #subscribe-button {
+                font-size: 5vw;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="video-container">
+        <video id="myVideo" playsinline preload="auto" loop>
+            <source src="chancho.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+
+        <video id="jumpVideo" playsinline preload="auto">
+            <source src="jumpin.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+
+        <div id="play-button"></div>
+
+        <div id="outro-overlay">
+            <div id="title-screen">
+                <div>WANDER</div>
+                <div>VENTURES</div>
+            </div>
+
+            <button id="jump-button">JUMP IN</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const myVideo = document.getElementById('myVideo');
+            const jumpVideo = document.getElementById('jumpVideo');
+            const playButton = document.getElementById('play-button');
+            const outroOverlay = document.getElementById('outro-overlay');
+            const jumpButton = document.getElementById('jump-button');
+
+            const fadeDelay = 3000;
+            const fadeDuration = 2000;
+
+            playButton.addEventListener('click', () => {
+                myVideo.muted = false;
+                jumpVideo.muted = false;
+
+                myVideo.play().then(() => {
+                    playButton.style.display = 'none';
+                    outroOverlay.style.display = 'flex';
+                }).catch(error => {
+                    console.error('Video playback failed:', error);
+                });
+            });
+
+            jumpButton.addEventListener('click', () => {
+                outroOverlay.style.display = 'none';
+
+                setTimeout(() => {
+                    jumpVideo.currentTime = 0;
+                    jumpVideo.play();
+                    jumpVideo.style.opacity = '1';
+                    myVideo.style.opacity = '0';
+
+                    setTimeout(() => {
+                        myVideo.pause();
+                        myVideo.remove();
+                    }, fadeDuration);
+                }, fadeDelay);
+            });
+
+            jumpVideo.addEventListener('ended', () => {
+                outroOverlay.innerHTML = `
+                    <div id="title-screen">TITLE</div>
+                    <div id="outro-text">
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    </div>
+                    <form>
+                        <button id="subscribe-button" type="submit">SUBSCRIBE</button>
+                    </form>
+                `;
+
+                outroOverlay.style.display = 'flex';
+            });
+        });
+    </script>
+
+</body>
+
+</html>
