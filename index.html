@@ -22,6 +22,7 @@
         }
 
         #video-container {
+            --video-x: 50%;
             width: 100%;
             height: 100%;
             position: relative;
@@ -32,10 +33,17 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            object-position: var(--video-x) bottom;
             position: absolute;
             top: 0;
             left: 0;
             transition: opacity 2s ease-in-out;
+        }
+
+        @media (orientation: portrait) {
+            #video-container {
+                --video-x: 100%;
+            }
         }
 
         #myVideo {
@@ -221,13 +229,19 @@
             const venturesTitle = document.querySelector('#title-screen div:last-child');
 
             let buttonIsCorner = false;
+            let buttonChangingIcon = false;
             let introStarted = false;
+            let jumpStarted = false;
             let soundOn = false;
             let waveVolumeLevel = 0;
             let fadeInAudio;
             let fadeWaveAudio;
             let fadeInDelay;
             let hideButtonTimeout;
+            let buttonMoveTimeout;
+            let portraitPanFrame;
+            let devicePanningReady = false;
+            let deviceOrientationActive = false;
 
             jumpVideo.volume = 0;
             myVideo.volume = 0;
@@ -237,16 +251,115 @@
 
             outroOverlay.style.display = 'flex';
 
-            function getWaveLoopVolume() {
-                if (!Number.isFinite(myVideo.duration) || myVideo.duration <= 0) {
-                    return 1;
+            function clamp(value, min, max) {
+                return Math.max(min, Math.min(max, value));
+            }
+
+            function smoothstep(value) {
+                return value * value * (3 - 2 * value);
+            }
+
+            function setVideoX(value) {
+                videoContainer.style.setProperty('--video-x', `${value}%`);
+            }
+
+            function isPortraitCropMode() {
+                if (!window.matchMedia('(orientation: portrait)').matches || !myVideo.videoWidth || !myVideo.videoHeight) {
+                    return false;
                 }
 
-                const fadeSeconds = Math.min(2, myVideo.duration / 2);
-                const timeToEnd = myVideo.duration - myVideo.currentTime;
+                return myVideo.videoWidth / myVideo.videoHeight > videoContainer.clientWidth / videoContainer.clientHeight;
+            }
 
-                if (myVideo.currentTime < fadeSeconds) {
-                    return myVideo.currentTime / fadeSeconds;
+            function handleDeviceOrientation(event) {
+                if (!devicePanningReady || !isPortraitCropMode() || !Number.isFinite(event.gamma)) {
+                    return;
+                }
+
+                setVideoX(clamp(50 + event.gamma * 1.4, 0, 100));
+            }
+
+            function enableDevicePanning() {
+                devicePanningReady = true;
+
+                if (!deviceOrientationActive) {
+                    deviceOrientationActive = true;
+                    window.addEventListener('deviceorientation', handleDeviceOrientation);
+                }
+            }
+
+            function requestDevicePanningPermission() {
+                if (typeof DeviceOrientationEvent === 'undefined') {
+                    return;
+                }
+
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(permission => {
+                            if (permission === 'granted') {
+                                enableDevicePanning();
+                            }
+                        })
+                        .catch(() => {});
+                } else {
+                    enableDevicePanning();
+                }
+            }
+
+            function startPortraitPan() {
+                cancelAnimationFrame(portraitPanFrame);
+
+                if (!isPortraitCropMode()) {
+                    setVideoX(50);
+                    return;
+                }
+
+                const startTime = performance.now();
+                setVideoX(100);
+
+                function animate(now) {
+                    if (!isPortraitCropMode()) {
+                        setVideoX(50);
+                        return;
+                    }
+
+                    const elapsed = now - startTime;
+
+                    if (elapsed <= 20000) {
+                        setVideoX(100 - 100 * smoothstep(elapsed / 20000));
+                        portraitPanFrame = requestAnimationFrame(animate);
+                        return;
+                    }
+
+                    if (elapsed <= 40000) {
+                        setVideoX(50 * smoothstep((elapsed - 20000) / 20000));
+                        portraitPanFrame = requestAnimationFrame(animate);
+                        return;
+                    }
+
+                    setVideoX(50);
+                    enableDevicePanning();
+                }
+
+                portraitPanFrame = requestAnimationFrame(animate);
+            }
+
+            function getWaveLoopEnd() {
+                if (jumpStarted) {
+                    return 40;
+                }
+
+                return Number.isFinite(myVideo.duration) && myVideo.duration > 0 ? myVideo.duration : 40;
+            }
+
+            function getWaveLoopVolume() {
+                const loopEnd = getWaveLoopEnd();
+                const fadeSeconds = Math.min(2, loopEnd / 2);
+                const currentTime = Math.min(myVideo.currentTime, loopEnd);
+                const timeToEnd = loopEnd - currentTime;
+
+                if (currentTime < fadeSeconds) {
+                    return currentTime / fadeSeconds;
                 }
 
                 if (timeToEnd < fadeSeconds) {
@@ -257,6 +370,13 @@
             }
 
             function applyWaveVolume() {
+                if (jumpStarted && myVideo.currentTime >= 40) {
+                    myVideo.currentTime = 0;
+                    myVideo.play().catch(error => {
+                        console.error('Wave video failed:', error);
+                    });
+                }
+
                 myVideo.volume = soundOn ? waveVolumeLevel * getWaveLoopVolume() : 0;
             }
 
@@ -296,45 +416,74 @@
                 }, 50);
             }
 
-            function showButtonWhileMoving() {
-                if (playButton.style.display === 'none') {
-                    return;
+            function setButtonOpacity(value) {
+                playButton.style.opacity = String(clamp(value, 0, 1));
+            }
+
+            function getButtonOpacity(event) {
+                const rect = playButton.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const distance = Math.hypot(event.clientX - centerX, event.clientY - centerY);
+                const radius = rect.width / 2;
+
+                if (distance <= radius) {
+                    return 1;
                 }
 
                 if (buttonIsCorner) {
-                    playButton.style.opacity = '1';
+                    return clamp(0.8 * (1 - (distance - radius) / 260), 0, 0.8);
                 }
 
+                const edgeDistance = Math.min(
+                    event.clientX,
+                    event.clientY,
+                    window.innerWidth - event.clientX,
+                    window.innerHeight - event.clientY
+                );
+
+                if (edgeDistance <= 100) {
+                    return 0;
+                }
+
+                return clamp(((edgeDistance - 100) / Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 2 - 100)) * 0.8, 0, 0.8);
+            }
+
+            function scheduleButtonHide() {
                 clearTimeout(hideButtonTimeout);
                 hideButtonTimeout = setTimeout(() => {
-                    playButton.style.opacity = '0';
+                    if (!playButton.matches(':hover')) {
+                        setButtonOpacity(0);
+                    }
                 }, 5000);
             }
 
-            function moveButtonToCorner() {
-                if (buttonIsCorner) {
-                    playButton.style.display = 'block';
-
-                    setTimeout(() => {
-                        playButton.classList.toggle('sound-on-icon', soundOn);
-                        playButton.style.opacity = '1';
-                        showButtonWhileMoving();
-                    }, 500);
-
+            function updateButtonFromPointer(event) {
+                if (playButton.style.display === 'none' || buttonChangingIcon) {
                     return;
                 }
 
-                playButton.style.opacity = '0';
+                setButtonOpacity(getButtonOpacity(event));
+                scheduleButtonHide();
+            }
 
-                setTimeout(() => {
-                    videoContainer.appendChild(playButton);
-                    playButton.classList.add('corner');
-                    playButton.classList.toggle('sound-on-icon', soundOn);
-                    buttonIsCorner = true;
+            function moveButtonToCorner() {
+                clearTimeout(buttonMoveTimeout);
+                buttonChangingIcon = true;
+                setButtonOpacity(0);
+
+                buttonMoveTimeout = setTimeout(() => {
+                    if (!buttonIsCorner) {
+                        videoContainer.appendChild(playButton);
+                        playButton.classList.add('corner');
+                        buttonIsCorner = true;
+                    }
+
                     playButton.style.display = 'block';
-                    playButton.style.opacity = '1';
-                    showButtonWhileMoving();
-                }, 500);
+                    playButton.classList.toggle('sound-on-icon', soundOn);
+                    setButtonOpacity(0);
+                    buttonChangingIcon = false;
+                }, 1000);
             }
 
             function startIntroTimers() {
@@ -364,34 +513,20 @@
                 }, 22700);
             }
 
-            document.addEventListener('mousemove', event => {
-                showButtonWhileMoving();
+            document.addEventListener('mousemove', updateButtonFromPointer);
 
-                if (buttonIsCorner || playButton.style.display === 'none') {
-                    return;
-                }
-
-                const rect = playButton.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-                const distance = Math.hypot(event.clientX - centerX, event.clientY - centerY);
-                const edgeDistance = Math.min(
-                    event.clientX,
-                    event.clientY,
-                    window.innerWidth - event.clientX,
-                    window.innerHeight - event.clientY
-                );
-
-                if (edgeDistance <= 100) {
-                    playButton.style.opacity = '0';
-                } else if (distance <= rect.width / 2) {
-                    playButton.style.opacity = '1';
-                } else {
-                    playButton.style.opacity = Math.min(0.8, (edgeDistance - 100) / Math.max(1, distance - rect.width / 2) * 0.8);
+            window.addEventListener('resize', () => {
+                if (!isPortraitCropMode()) {
+                    cancelAnimationFrame(portraitPanFrame);
+                    setVideoX(50);
                 }
             });
 
-            myVideo.addEventListener('playing', startIntroTimers, { once: true });
+            myVideo.addEventListener('playing', () => {
+                startIntroTimers();
+                startPortraitPan();
+            }, { once: true });
+
             myVideo.addEventListener('timeupdate', applyWaveVolume);
             setInterval(applyWaveVolume, 100);
 
@@ -401,7 +536,8 @@
 
             playButton.addEventListener('click', () => {
                 clearTimeout(fadeInDelay);
-                playButton.style.opacity = '0';
+                requestDevicePanningPermission();
+                setButtonOpacity(0);
 
                 if (soundOn) {
                     soundOn = false;
@@ -426,17 +562,27 @@
             });
 
             jumpButton.addEventListener('click', () => {
+                requestDevicePanningPermission();
+                jumpStarted = true;
                 soundOn = true;
+
+                if (myVideo.currentTime >= 40) {
+                    myVideo.currentTime = 0;
+                }
+
                 myVideo.muted = false;
                 fadeWaveVolume(1);
 
                 jumpVideo.currentTime = 0;
                 jumpVideo.muted = false;
                 jumpVideo.volume = 0;
-                playButton.style.opacity = '0';
+                setButtonOpacity(0);
                 moveButtonToCorner();
 
-                jumpVideo.play();
+                jumpVideo.play().catch(error => {
+                    console.error('Jump video failed:', error);
+                });
+
                 jumpVideo.style.opacity = '1';
                 outroOverlay.style.opacity = '0';
 
